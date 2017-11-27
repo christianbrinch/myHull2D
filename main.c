@@ -2,9 +2,10 @@
 #include <gsl/gsl_randist.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 #include <math.h>
 
-int npoints = 200;
+int npoints = 20000;
 
 typedef struct {
   int id;
@@ -19,11 +20,13 @@ typedef struct {
   point *pointID[3];
   edge edge[3];
   double normal[3];
+  int fingerprint;
   int isLowerMFace;
 } face;
 
 typedef struct {
   face *facet;
+  int *isInUse;
   size_t used;
   size_t size;
 } Container;
@@ -115,30 +118,60 @@ checkLowerHull(face facet, point *P){
 
 int
 checkForDuplicateFacet(Container *c, int f){
-  int perm[npoints], i, j, t;
-  // Check if facet already exists
-  for (i = 0; i < f; i++){
+    int perm[npoints], i, j, t;
+    // Check if facet already exists
+    if(!c->isInUse[c->facet[f].pointID[2]->id]){
+        return 0;
+    }
+    for (i = 0; i < f; i++){
+      if(c->facet[f].fingerprint == c->facet[i].fingerprint){
+        return 1;
+      }
+    }
+    return 0;
+/*
     for(j = 0; j < npoints; j++){
-      perm[j] = 0;
+        perm[j] = 0;
     }
-    for(j = 0; j < 3; j++){
-      perm[c->facet[i].pointID[j]->id] += 1;
+    for (i = 0; i < f; i++){
+        for(j = 0; j < 3; j++){
+            perm[c->facet[i].pointID[j]->id] += 1;
+        }
+        for(j= 0; j < 3; j++){
+            perm[c->facet[f].pointID[j]->id] -= 1;
+        }
+        t = 0;
+        for(j = 0; j < npoints; j++){
+            if(perm[j] != 0){
+                t += 1;
+                perm[j]=0;
+            }
+        }
+        if(t == 0) {
+            return 1;
+        }
     }
-    for(j= 0; j < 3; j++){
-      perm[c->facet[f].pointID[j]->id] -= 1;
-    }
-    t = 0;
-    for(j = 0; j < npoints; j++){
-      t += abs(perm[j]);
-    }
-    if(t == 0) return 1;
-  }
-  return 0;
+    return 0;
+*/
+}
+
+void swap(int *a, int *b){
+  int tmp;
+  tmp=*a;
+  *a=*b;
+  *b=tmp;
+}
+
+unsigned concatenate(unsigned x, unsigned y) {
+    unsigned pow = 10;
+    while(y >= pow)
+        pow *= 10;
+    return x * pow + y;
 }
 
 void
 defineFacet(Container *c, int f, point *p1, point *p2, point *p3){
-  int k, i;
+  int k, i, x,y,z;
   double norm;
   // Create new facet
   if(c->used == c->size - 1){
@@ -157,10 +190,21 @@ defineFacet(Container *c, int f, point *p1, point *p2, point *p3){
 
   }
   cross(c->facet[f].edge[0].r, c->facet[f].edge[1].r, c->facet[f].normal);
-  norm = sqrt(dot(c->facet[f].edge[0].r, c->facet[f].edge[0].r)*dot(c->facet[f].edge[1].r, c->facet[f].edge[1].r) - pow(dot(c->facet[f].edge[0].r, c->facet[f].edge[1].r), 2) );
-  for(i = 0; i < 3; i++){
-    c->facet[f].normal[i] = c->facet[f].normal[i]/norm;
+  //norm = sqrt(dot(c->facet[f].edge[0].r, c->facet[f].edge[0].r)*dot(c->facet[f].edge[1].r, c->facet[f].edge[1].r) - pow(dot(c->facet[f].edge[0].r, c->facet[f].edge[1].r), 2) );
+  //for(i = 0; i < 3; i++){
+  //  c->facet[f].normal[i] = c->facet[f].normal[i]/norm;
+  //}
+  x=p1->id;y=p2->id;z=p3->id;
+  if(x>z){
+    swap(&x,&y);
   }
+  if(x>y){
+    swap(&x,&y);
+  }
+  if(y>z){
+    swap(&y,&z);
+  }
+  c->facet[f].fingerprint = concatenate(concatenate(x,y),z);
 }
 
 
@@ -168,15 +212,16 @@ defineFacet(Container *c, int f, point *p1, point *p2, point *p3){
 
 int
 traverse(int f, int root, int side, Container *c, point *P){
-  int j,best, tmp;
-  double best_angle=0.,angle;
+  int j, k, best=-1, tmp;
+  double best_angle=1e30,angle;
   tmp=f;
 
   for(j=0;j<npoints;j++){
     if(j!=c->facet[root].pointID[0]->id && j!=c->facet[root].pointID[1]->id && j!=c->facet[root].pointID[2]->id){
       defineFacet(c, f, &P[c->facet[root].pointID[(side+0)%3]->id], &P[c->facet[root].pointID[(side+1)%3]->id], &P[j]);
-      angle = acos(dot(c->facet[root].normal,c->facet[f].normal)/(sqrt(dot(c->facet[root].normal,c->facet[root].normal))*sqrt(dot(c->facet[f].normal,c->facet[f].normal))) );
-      if(angle>best_angle){
+      //angle = acos(dot(c->facet[root].normal,c->facet[f].normal)/(sqrt(dot(c->facet[root].normal,c->facet[root].normal))*sqrt(dot(c->facet[f].normal,c->facet[f].normal))) );
+      angle = dot(c->facet[root].normal,c->facet[f].normal)/(sqrt(dot(c->facet[root].normal,c->facet[root].normal))*sqrt(dot(c->facet[f].normal,c->facet[f].normal)));
+      if(angle<best_angle){
         best_angle = angle;
         best = j;
       }
@@ -196,6 +241,9 @@ traverse(int f, int root, int side, Container *c, point *P){
   }
 
   c->facet[f].isLowerMFace = checkLowerHull(c->facet[f],P);
+  for(k = 0; k < 3; k++){
+    c->isInUse[c->facet[f].pointID[k]->id] = 1;
+  }
 
 
   f = traverse(f+1, tmp, (side+1)%3, c, P);
@@ -206,7 +254,7 @@ traverse(int f, int root, int side, Container *c, point *P){
 
 void
 triangulate(Container *c, point *P){
-  int m, n, p, f=0;
+  int m, n, p, k, f=0;
 
   // Lift points to higher dimensional paraboloid
   for(p = 0; p < npoints; p++){
@@ -230,6 +278,10 @@ triangulate(Container *c, point *P){
     exit(0);
   }
   c->facet[f].isLowerMFace = checkLowerHull(c->facet[0], P);
+  for(k = 0; k < 3; k++){
+    c->isInUse[c->facet[f].pointID[k]->id] = 1;
+  }
+
   // initial M-face found
 
   f=traverse(f+1, 0, 0, c, P);
@@ -238,12 +290,16 @@ triangulate(Container *c, point *P){
 
 void initContainer(Container *c, size_t np) {
   c->facet = (face *)malloc(np * sizeof(face));
+  c->isInUse = (int *)malloc(np * sizeof(int));
+  memset(c->isInUse,0,sizeof(c->isInUse));
   c->used = 0;
   c->size = np;
 }
 
 void freeContainer(Container *c){
   free(c->facet);
+  free(c->isInUse);
+  c->isInUse = NULL;
   c->facet = NULL;
   c->used = c->size = 0;
 }
@@ -262,14 +318,15 @@ main(){
   for(i=0;i<npoints;i++){
     P[i].id = i;
     for(j=0;j<2;j++){
-      P[i].x[j]=gsl_ran_gaussian(ran,0.4);
-      //P[i].x[j]=(2*gsl_rng_uniform(ran))-1.;
+      //P[i].x[j]=gsl_ran_gaussian(ran,0.4);
+      P[i].x[j]=(2*gsl_rng_uniform(ran))-1.;
     }
   }
 
   initContainer(&c,npoints);
   triangulate(&c, P);
 
+/*
   // Lloyd smoothing
   for(i=0;i<25;i++){
     for(f=0;f<c.used;f++){
@@ -295,7 +352,7 @@ main(){
     initContainer(&c,npoints);
     triangulate(&c, P);
   }
-
+*/
 
   for(j=0;j<npoints;j++){
     printf("%f %f %f\n", P[j].x[0],P[j].x[1], P[j].x[2]);
@@ -305,6 +362,7 @@ main(){
       printf("%d %d %d\n", c.facet[f].pointID[0]->id, c.facet[f].pointID[1]->id, c.facet[f].pointID[2]->id);
     }
   }
+  printf("Number of facets on the hull: %d\n", c.used);
   freeContainer(&c);
   gsl_rng_free(ran);
 }
