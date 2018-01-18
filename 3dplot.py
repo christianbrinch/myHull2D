@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 point=np.loadtxt('tmp')
-npo=2000
+npo=200
 x=point[0:npo,0]
 y=point[0:npo,1]
 z=point[0:npo,2]

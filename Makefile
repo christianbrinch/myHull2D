@@ -4,7 +4,7 @@ CC = gcc -std=gnu99 -m64 -O3 -funroll-loops
 LIBS = -L/opt/local/lib 
 FLAGS = -lgsl -lm
 
-default: program
+default: quickhull
 
 .SUFFIXES: .c .o
 .c:
@@ -13,10 +13,14 @@ default: program
 	$(CC) -c -o $*.o $<
 
 source:
-	$(CC) ${LIBS} -c quickhull.c
+	$(CC) ${LIBS} -c quickhull.c main.c
 
-program: quickhull.o
-	$(CC) ${LIBS} ${FLAGS} -o hull.x *.o
+quickhull: quickhull.o
+	$(CC) ${LIBS} ${FLAGS} -o quick.x quickhull.o
+
+giftwrap: main.o
+	$(CC) ${LIBS} ${FLAGS} -o wrap.x main.o
+
 
 clean:
 	rm -f *.o *.x a.out
