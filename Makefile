@@ -1,19 +1,20 @@
-shell = /bin/sh
-CC = gcc -std=gnu99 -m64 -O3 -funroll-loops 
+TARGET = quickhull
+CC = gcc 
+CFLAGS = -std=gnu99 -m64 -O3 -funroll-loops -Wall -I/opt/local/include
+LIBS = -lm -lgsl -L/opt/local/lib 
 
-LIBS = -L/opt/local/lib 
-FLAGS = -lgsl -lm
+.PHONY: default all clean
 
-default: quickhull
+default: $(TARGET)
+
+all: default
 
 .SUFFIXES: .c .o
-.c:
-	$(CC) -c -o $*.o $<
-.o:
-	$(CC) -c -o $*.o $<
+.o .c:
+	$(CC) $(CFLAGS) -c $< -o $@
 
 source:
-	$(CC) ${LIBS} -c quickhull.c main.c
+	$(CC) ${LIBS} ${INCLUDE} -c quickhull.c main.c
 
 quickhull: quickhull.o
 	$(CC) ${LIBS} ${FLAGS} -o quick.x quickhull.o
